@@ -39,12 +39,23 @@ unsigned long timerDelay = 5000;
 bool gotNewDetails = false;
 
 // Screen states
-enum Screen { S_Live, S_Cloud};
-static Screen screen = S_Live;
+enum Screen { S_CLOUD, S_SELECT_AVG, S_DATA_RESULT};
+static Screen screen = S_CLOUD;
 static bool stateChangedThisLoop = true;
 
+//Username
+String userId = "MyUserName"; // Dummy User ID
+
+//buttons
+ButtonColors onCol = {BLACK, WHITE, WHITE};
+ButtonColors offColTut = {TFT_LIGHTGREY, BLACK, NODRAW};
+Button userID_BTN(20, 75, 80, 50, false, "User ID", offColTut, onCol);
+Button timeDuration_BTN(120, 75100, 80, 50, false, "Time", offColTut, onCol);
+Button dataType_BTN(220, 75, 80, 50, false, "Data Type", offColTut, onCol);
+Button SELECT_BTN(120, 200, 80, 50, false, "Average", offColTut, onCol);
+
 ////////////////////////////////////////////////////////////////////
-// TODO 3: Device Details Structure
+// Device Details Structure
 ////////////////////////////////////////////////////////////////////
 struct deviceDetails {
     int prox;
@@ -58,6 +69,11 @@ struct deviceDetails {
     long long timeCaptured;
     long long cloudUploadTime;
 };
+
+deviceDetails latestDocDetails;
+
+// Device details
+deviceDetails details;
 
 ////////////////////////////////////////////////////////////////////
 // Method header declarations
@@ -74,6 +90,11 @@ double convertCintoF(double c);
 String generateUserIdHeader(String userId);
 bool gcfGetWithUserHeader(String serverUrl, String userId, deviceDetails *latestDocDetails);
 int httpGetLatestWithHeaders(String serverURL, String *headerKeys, String *headerVals, int numHeaders, deviceDetails *details);
+void drawS_CLOUD();
+String time_to_timestamp(long millis, bool isTimeCaptured);
+void drawS_SELECT_AVG();
+void drawS_DATA_RESULT();
+void hideButtons();
 
 ///////////////////////////////////////////////////////////////
 // Put your setup code here, to run once
@@ -135,10 +156,10 @@ void loop()
     M5.update();
 
     if (M5.BtnB.wasPressed()) {
-        if (screen == S_Live) {
-            screen = S_Cloud;
+        if (screen == S_CLOUD) {
+            screen = S_SELECT_AVG;
         } else {
-            screen = S_Live;
+            screen = S_SELECT_AVG;
         }
         stateChangedThisLoop = true;
         lastTime = millis();
@@ -181,18 +202,10 @@ void loop()
     timeClient.update();
     unsigned long epochTime = timeClient.getEpochTime();
     unsigned long long epochMillis = ((unsigned long long)epochTime)*1000;
-    struct tm *ptm = gmtime ((time_t *)&epochTime);
-    Serial.printf("\nCurrent Time:\n\tEpoch (ms): %llu", epochMillis);
-    Serial.printf("\n\tFormatted: %d/%d/%d ", ptm->tm_mon+1, ptm->tm_mday, ptm->tm_year+1900);
-    Serial.printf("%02d:%02d:%02d%s\n\n", timeClient.getHours() % 12, timeClient.getMinutes(), timeClient.getSeconds(), timeClient.getHours() < 12 ? "AM" : "PM");
-    
-    // Dummy User ID
-    String userId = "MyUserName";
-    
-    // Device details
-    deviceDetails details;
 
-    deviceDetails latestDocDetails;
+
+
+
 
     ///////////////////////////////////////////////////////////
     // Post data (and possibly file)
@@ -217,52 +230,120 @@ void loop()
         details.accZ = accZ;
         details.timeCaptured = epochTime;
         details.cloudUploadTime = 0;
+        
+    // tap diff buttons to get to the diff screens
+    if (M5.BtnA.wasPressed() && screen != S_CLOUD) {
+        screen = S_CLOUD;
+        stateChangedThisLoop = true;
+    }
+    if (M5.BtnB.wasPressed() && screen != S_SELECT_AVG) {
+        screen = S_SELECT_AVG;
+        stateChangedThisLoop = true;
+    }
+
     // Changing to and from screens
     if (stateChangedThisLoop) {
-        if (screen == S_Cloud) {
-        if (gotNewDetails) {
-            M5.Lcd.fillScreen(BLACK);
-            M5.Lcd.setCursor(120, 10);
-            M5.Lcd.setTextColor(WHITE);
-            M5.Lcd.setTextSize(1);
-            M5.Lcd.print("Cloud Data");
-            M5.Lcd.setCursor(10, 50);
-            M5.Lcd.print("Temp: ");
-            M5.Lcd.print(latestDocDetails.temp);
-            M5.Lcd.setCursor(10, 100);
-            M5.Lcd.print("Humidity: ");
-            M5.Lcd.print(latestDocDetails.rHum);
-            M5.Lcd.setCursor(10, 150);
-            M5.Lcd.print("Time: ");
-            M5.Lcd.print(latestDocDetails.timeCaptured);
-            M5.Lcd.setCursor(10, 200);
-            M5.Lcd.print("Cloud Time: ");
-            M5.Lcd.print(latestDocDetails.cloudUploadTime);
-        }
-        } else if(screen == S_Live){
-            M5.Lcd.fillScreen(BLACK);
-            M5.Lcd.setCursor(120, 10);
-            M5.Lcd.setTextColor(WHITE);
-            M5.Lcd.setTextSize(1);
-            M5.Lcd.print("Live Data");
-            M5.Lcd.setCursor(10, 50);
-            M5.Lcd.print("Temp: ");
-            M5.Lcd.print(details.temp);
-            M5.Lcd.setCursor(10, 100);
-            M5.Lcd.print("Humidity: ");
-            M5.Lcd.print(details.rHum);
-            M5.Lcd.setCursor(10, 150);
-            M5.Lcd.print("Time: ");
-            M5.Lcd.print(details.timeCaptured);
-            M5.Lcd.setCursor(10, 200);
-            M5.Lcd.print("Cloud Time: ");
-            M5.Lcd.print(details.cloudUploadTime);
+        if (screen == S_CLOUD) {
+            if (gotNewDetails) {
+                drawS_CLOUD();
+            }
+        } else if(screen == S_SELECT_AVG){
+            //TODO
+            drawS_SELECT_AVG();
+            // if select button is clicked, set screen to S_DATA_RESULT to display the results of the call
         }
         
     }
     stateChangedThisLoop = false;
     gotNewDetails = false;
 }
+
+////////////////////////////////////////////////////////////////////
+//Drawing Screens
+////////////////////////////////////////////////////////////////////
+
+void drawS_CLOUD() {
+    hideButtons();
+    M5.Lcd.fillScreen(BLACK);
+    M5.Lcd.setCursor(120, 10);
+    M5.Lcd.setTextColor(WHITE);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.print("Cloud Data");
+    M5.Lcd.setCursor(10, 40);
+    M5.Lcd.print("User id: ");
+    M5.Lcd.print(userId);
+    M5.Lcd.setCursor(10, 80);
+    M5.Lcd.print("Temp: ");
+    M5.Lcd.print(latestDocDetails.temp);
+    M5.Lcd.setCursor(10, 120);
+    M5.Lcd.print("Humidity: ");
+    M5.Lcd.print(latestDocDetails.rHum);
+    M5.Lcd.setCursor(10, 160);
+    M5.Lcd.print("Time: ");
+    M5.Lcd.print(time_to_timestamp(latestDocDetails.timeCaptured, true)); // in seconds
+    M5.Lcd.setCursor(10, 200);
+    M5.Lcd.print("Cloud Time: ");
+    M5.Lcd.print(time_to_timestamp(latestDocDetails.cloudUploadTime, true));
+
+}
+
+String time_to_timestamp(long time, bool isTimeCaptured) {
+    unsigned long long miliseconds;
+    Serial.println(time);
+    if (!isTimeCaptured) {
+        miliseconds  = time * 1000;
+    } else {
+        miliseconds = time;
+    }
+
+    Serial.println(miliseconds);
+    
+    struct tm *ptm = gmtime ((time_t *)&miliseconds);
+    String dateStr = String(ptm->tm_mon+1) + "/" + String(ptm->tm_mday) + "/" + String(ptm->tm_year+1900);
+    
+    String timeStr = String((miliseconds  % 86400L) / 3600) + ":" + String((miliseconds % 3600) / 60) + ":" + String(miliseconds % 60) + String(((miliseconds  % 86400L) / 3600) < 12 ? "AM" : "PM");
+    
+    return dateStr + " " + timeStr;
+}
+
+void drawS_SELECT_AVG(){
+    userID_BTN.draw();
+    timeDuration_BTN.draw();
+    dataType_BTN.draw();
+    SELECT_BTN.draw();
+}
+
+void drawS_DATA_RESULT() {
+    // TODO: retrieve all the relevant data from the cloud function in the future    hideButtons();   
+    M5.Lcd.fillScreen(BLACK);
+    M5.Lcd.setCursor(120, 10);
+    M5.Lcd.setTextColor(TFT_GREEN);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.print("Results of Averaged Data");
+    M5.Lcd.setCursor(10, 40);
+    M5.Lcd.print("Data Type: ");
+    M5.Lcd.print("TBD"); // TODO: get the data type from the JSON object
+    M5.Lcd.setCursor(10, 80);
+    M5.Lcd.print("Averaged data: ");
+    M5.Lcd.print("TBD with units"); // TODO: get the averaged data back w/ corresponding units
+    M5.Lcd.setCursor(10, 120);
+    M5.Lcd.print("Range of actual data: ");
+    M5.Lcd.print("TBD"); // TODO: get the the range of the actual data
+    M5.Lcd.setCursor(10, 160);
+    M5.Lcd.print("Number of data points: ");
+    M5.Lcd.print("TBD"); // TODO: get the number of data points
+    M5.Lcd.setCursor(10, 200);
+    M5.Lcd.print("Rate of data collection: ");
+    M5.Lcd.print("TBD"); // TODO: get the rate of data collection
+}
+
+void hideButtons(){
+    userID_BTN.hide();
+    timeDuration_BTN.hide();
+    dataType_BTN.hide();
+    SELECT_BTN.hide();
+}
+
 
 ////////////////////////////////////////////////////////////////////
 // This method takes in a user ID, time and structure describing
@@ -435,12 +516,11 @@ int httpGetLatestWithHeaders(String serverURL, String *headerKeys, String *heade
 
     Serial.println("converting details:");
     char* endPtr;
-    details->cloudUploadTime = std::strtoll(cloudTime.c_str(), &endPtr, 10);
+    details->cloudUploadTime = cloudTime.toInt();
     Serial.print("cloud time:");
     Serial.println(details->cloudUploadTime);
     Serial.println("Converted cloud time");
-    char* endPtr2;
-    details->timeCaptured = std::strtoll(timeCaptured.c_str(), &endPtr2, 10);
+    details->timeCaptured = timeCaptured.toInt();
     Serial.println("Converted time caputred");
     details->temp = temp.toDouble();
     Serial.println("Converted temp");
