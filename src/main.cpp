@@ -48,7 +48,7 @@ static Screen screen = S_CLOUD;
 static bool stateChangedThisLoop = true;
 
 //Username
-String userId = "userId2"; // Dummy User ID
+String userId = "userId1"; // Dummy User ID
 
 //buttons
 //x,y,width, height, bool, text, oncolours, off colours
@@ -176,6 +176,9 @@ void setup()
     }
     Serial.print("\n\nConnected to WiFi network with IP address: ");
     Serial.println(WiFi.localIP());
+    vcnl4040.enableAmbientLight(true);
+    vcnl4040.enableWhiteLight(true);
+    vcnl4040.enableProximity(true);
 
     ///////////////////////////////////////////////////////////
     // Init time connection
@@ -225,7 +228,7 @@ void loop()
     // Read VCNL4040 Sensors
     uint16_t prox = vcnl4040.getProximity();
     uint16_t ambientLight = vcnl4040.getLux();
-    uint16_t whiteLight = vcnl4040.getWhiteLight(); //vcnl4040.getWhiteLight();
+    uint16_t whiteLight = vcnl4040.getWhiteLight();
 
     // Read SHT40 Sensors
     sensors_event_t rHum, temp;
@@ -250,7 +253,6 @@ void loop()
     ///////////////////////////////////////////////////////////
     // Post data
     ///////////////////////////////////////////////////////////
-    if ((millis() - lastTime) > timerDelay && screen == S_CLOUD) {
         details.prox = prox;
         details.ambientLight = ambientLight;
         details.whiteLight = whiteLight;
@@ -261,7 +263,7 @@ void loop()
         details.accZ = accZ;
         details.timeCaptured = epochTime;
         details.cloudUploadTime = 0;
-        
+    if ((millis() - lastTime) > timerDelay && screen == S_CLOUD) {
         gcfGetWithHeader(URL_GCF_UPLOAD, userId, epochTime, &details);
         drawS_CLOUD();
         stateChangedThisLoop = true;
@@ -372,19 +374,24 @@ void drawS_CLOUD() {
     M5.Lcd.setTextColor(TFT_GREEN);
     M5.Lcd.print("Raw White Light: ");
     M5.Lcd.setTextColor(TFT_WHITE);
-    M5.Lcd.printf("%.2flux",details.whiteLight);
+    M5.Lcd.printf("%dlux",details.whiteLight);
     M5.Lcd.setCursor(10, 140);
     M5.Lcd.setTextColor(TFT_GREEN);
     M5.Lcd.print("Ambient Light: ");
     M5.Lcd.setTextColor(TFT_WHITE);
-    M5.Lcd.printf("%.2flux",details.ambientLight);
+    M5.Lcd.printf("%dlux",details.ambientLight);
     M5.Lcd.setCursor(10, 160);
     M5.Lcd.setTextColor(TFT_GREEN);
     M5.Lcd.print("Accel: ");
     M5.Lcd.setTextColor(TFT_WHITE);
     M5.Lcd.printf("%.2fx, %.2fy, %.2fz", details.accX, details.accY, details.accZ);
+    M5.Lcd.setCursor(10, 180);
+    M5.Lcd.setTextColor(TFT_GREEN);
+    M5.Lcd.print("Prox: ");
+    M5.Lcd.setTextColor(TFT_WHITE);
+    M5.Lcd.printf("%d", details.prox);
 
-    M5.Lcd.setCursor(60, 200);
+    M5.Lcd.setCursor(60, 220);
     timeClient.update();
     unsigned long epochTime = timeClient.getEpochTime();
     unsigned long long epochMillis = ((unsigned long long)epochTime)*1000;
@@ -472,6 +479,9 @@ void drawS_DATA_RESULT() {
     M5.Lcd.setTextColor(TFT_GREEN);
     M5.Lcd.print("Data Type: ");
     String avgDataType = avgDocDetails.dataType;
+    if (avgDataType.equalsIgnoreCase("rHum")) {
+        avgDataType = "Humidity";
+    }
     M5.Lcd.setTextColor(TFT_WHITE);
     M5.Lcd.println(avgDataType);
     
@@ -481,7 +491,7 @@ void drawS_DATA_RESULT() {
     String units = "";
     if (avgDataType.equalsIgnoreCase("temp")) {
         units = "C";
-    } else if (avgDataType.equalsIgnoreCase("rhum")) {
+    } else if (avgDataType.equalsIgnoreCase("rHum")) {
         units = "%";
     } else {
         units = "lux";
