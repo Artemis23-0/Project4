@@ -491,7 +491,7 @@ void drawS_DATA_RESULT() {
     String units = "";
     if (avgDataType.equalsIgnoreCase("temp")) {
         units = "C";
-    } else if (avgDataType.equalsIgnoreCase("rHum")) {
+    } else if (avgDataType.equalsIgnoreCase("Humidity")) {
         units = "%";
     } else {
         units = "lux";
