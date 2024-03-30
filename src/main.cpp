@@ -454,7 +454,6 @@ void drawS_SELECT_AVG() {
 void drawS_DATA_RESULT() {
     M5.Lcd.clearDisplay();
     hideButtons();
-    // TODO: retrieve all the relevant data from the cloud function in the future    hideButtons();   
     M5.Lcd.fillScreen(BLACK);
     M5.Lcd.setCursor(60, 20);
     M5.Lcd.setTextColor(TFT_GREEN);
